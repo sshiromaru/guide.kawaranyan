@@ -6,42 +6,31 @@
 <title>Kawara-nyan AR</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:#000; overflow:hidden; font-family:'Hiragino Maru Gothic ProN','M PLUS Rounded 1c',sans-serif; }
+  body { background:#000; overflow:hidden; font-family:sans-serif; }
   #overlay { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; pointer-events:none; }
-  #reticle { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:64px; height:64px; border:2px solid rgba(74,144,217,0.9); border-radius:50%; display:none; z-index:20; animation:reticlePulse 1.5s ease-in-out infinite; }
-  @keyframes reticlePulse { 0%,100% { box-shadow:0 0 0 0 rgba(74,144,217,0.4); } 50% { box-shadow:0 0 0 12px rgba(74,144,217,0); } }
-  #speech { position:fixed; top:60px; left:50%; transform:translateX(-50%); background:rgba(10,25,60,0.92); border:1.5px solid rgba(74,144,217,0.8); border-radius:16px; padding:12px 20px; color:#f0f8ff; font-size:14px; text-align:center; max-width:280px; visibility:hidden; opacity:0; z-index:30; transition:opacity 0.3s ease; }
-  #speech.show { visibility:visible; opacity:1; }
-  #bottom-ui { width:100%; padding:0 0 48px; display:flex; flex-direction:column; align-items:center; gap:16px; pointer-events:auto; }
-  #start-btn { background:linear-gradient(135deg,#1a3a6b,#2255a0); border:none; border-radius:50px; color:#f0f8ff; font-size:16px; padding:16px 44px; cursor:pointer; }
-  #action-btns { display:none; gap:10px; flex-wrap:wrap; justify-content:center; }
-  .action-btn { background:rgba(10,25,60,0.85); border:1.5px solid rgba(74,144,217,0.6); border-radius:50px; color:#b8d8f0; font-size:13px; font-weight:700; padding:9px 18px; cursor:pointer; }
-  .action-btn.orange { border-color:rgba(245,144,30,0.6); color:#fcd9a0; }
   
-  /* パネル用のスタイルを追加 */
-  #map-panel, #route-panel { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:min(300px, 90vw); background:rgba(5,15,40,0.96); border:1.5px solid rgba(74,144,217,0.7); border-radius:20px; padding:20px; z-index:50; visibility:hidden; opacity:0; pointer-events:none; transition:0.3s; }
-  #map-panel.show, #route-panel.show { visibility:visible; opacity:1; pointer-events:auto; }
-  .close-btn { position:absolute; top:10px; right:14px; background:none; border:none; color:#6baed6; cursor:pointer; }
+  /* ボタンのスタイル */
+  #bottom-ui { width:100%; padding:0 0 48px; display:flex; flex-direction:column; align-items:center; gap:16px; pointer-events:auto; }
+  #start-btn { background:linear-gradient(135deg,#1a3a6b,#2255a0); border:none; border-radius:50px; color:#fff; padding:16px 44px; cursor:pointer; }
+  
+  /* 全ボタンを常に表示する設定に変更 */
+  #action-btns { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+  .action-btn { background:rgba(10,25,60,0.85); border:1.5px solid #4a90d9; border-radius:50px; color:#fff; padding:10px 20px; cursor:pointer; }
+  .orange { border-color:#f5901e; color:#fcd9a0; }
+
+  /* パネル */
+  #map-panel, #route-panel { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:280px; background:#050f1e; border:1px solid #4a90d9; border-radius:20px; padding:20px; z-index:50; display:none; pointer-events:auto; color:#fff; }
+  .show { display:block !important; }
+  .close-btn { position:absolute; top:10px; right:15px; background:none; border:none; color:#fff; cursor:pointer; font-size:20px; }
+  
   canvas { display:block; width:100vw; height:100vh; }
 </style>
 </head>
 <body>
 
 <div id="overlay">
-  <div id="reticle"></div>
-  <div id="speech"></div>
-
-  <div id="map-panel">
-    <button class="close-btn" onclick="closeMap()">✕</button>
-    <h3>🗺️ 周辺マップ</h3>
-    <p style="color:#fff; margin-top:10px;">ここに周辺情報が表示されます。</p>
-  </div>
-
-  <div id="route-panel">
-    <button class="close-btn" onclick="closeRoute()">✕</button>
-    <h3>🏁 ルート案内</h3>
-    <p style="color:#fff; margin-top:10px;">案内所までご案内します！</p>
-  </div>
+  <div id="map-panel"><button class="close-btn" onclick="closeAll()">✕</button><h3>🗺️ 周辺情報</h3><p>ここに周辺マップが表示されます。</p></div>
+  <div id="route-panel"><button class="close-btn" onclick="closeAll()">✕</button><h3>🏁 ルート案内</h3><p>案内所までご案内します！</p></div>
 
   <div id="bottom-ui">
     <button id="start-btn" onclick="startAR()">✨ ARを起動する</button>
@@ -56,92 +45,42 @@
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
-let camera, scene, renderer, xrSession, hitTestSource, hitTestSourceReq;
-let reticleObj, kawaraGroup, placed = false;
-let clock = new THREE.Clock();
+let renderer, scene, camera, reticleObj, kawaraGroup;
 
-const speechEl = document.getElementById('speech');
-const actionBtns = document.getElementById('action-btns');
-const startBtn = document.getElementById('start-btn');
-
-window.startAR = async function() {
-  if (!navigator.xr) return;
-  startBtn.style.display = 'none';
-  initThree();
-  await startXRSession();
-};
-
-function initThree() {
+window.startAR = async () => {
+  document.getElementById('start-btn').style.display = 'none';
+  // Three.jsの初期化
   scene = new THREE.Scene();
+  scene.add(new THREE.AmbientLight(0xffffff, 1));
   camera = new THREE.PerspectiveCamera();
   renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.xr.enabled = true;
   document.body.insertBefore(renderer.domElement, document.body.firstChild);
-  
-  scene.add(new THREE.AmbientLight(0xffffff, 1));
-  
-  reticleObj = new THREE.Mesh(new THREE.RingGeometry(0.04, 0.06, 32).rotateX(-Math.PI/2), new THREE.MeshBasicMaterial({ color:0xffffff }));
-  reticleObj.visible = false;
-  scene.add(reticleObj);
 
-  // キャラクター読み込み
+  // キャラクター
   const loader = new THREE.TextureLoader();
   const tex = loader.load('./kawaranyan.webp');
-  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
-  const sprite = new THREE.Sprite(mat);
-  sprite.scale.set(0.55, 0.82, 1);
-  sprite.position.y = 0.41;
   kawaraGroup = new THREE.Group();
-  kawaraGroup.add(sprite);
+  kawaraGroup.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent:true })));
   kawaraGroup.visible = false;
   scene.add(kawaraGroup);
-}
 
-async function startXRSession() {
-  xrSession = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test'], optionalFeatures: ['dom-overlay'], domOverlay: { root: document.getElementById('overlay') } });
-  renderer.xr.setSession(xrSession);
-  const refSpace = await xrSession.requestReferenceSpace('viewer');
-  hitTestSourceReq = await xrSession.requestHitTestSource({ space: refSpace });
-  xrSession.addEventListener('select', onSelect);
-  renderer.setAnimationLoop(renderXR);
-}
-
-function onSelect() {
-  if (!placed) {
-    kawaraGroup.position.setFromMatrixPosition(reticleObj.matrix);
-    kawaraGroup.visible = true;
-    placed = true;
-    actionBtns.style.display = 'flex';
-    kawara_say('こんにちはにゃ！');
-  }
-}
-
-function renderXR(timestamp, frame) {
-  if (frame) {
-    const results = frame.getHitTestResults(hitTestSourceReq);
-    if (results.length > 0) {
-      reticleObj.visible = true;
-      reticleObj.matrix.fromArray(results[0].getPose(renderer.xr.getReferenceSpace()).transform.matrix);
-    } else {
-      reticleObj.visible = false;
-    }
-  }
-  renderer.render(scene, camera);
-}
-
-window.kawara_say = (text) => {
-  speechEl.innerHTML = text;
-  speechEl.classList.add('show');
-  setTimeout(() => speechEl.classList.remove('show'), 3000);
+  const session = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test'] });
+  renderer.xr.setSession(session);
+  renderer.setAnimationLoop((time, frame) => {
+    renderer.render(scene, camera);
+  });
 };
 
-// ボタン機能
-window.doGreet = () => kawara_say('あいさつするにゃ！👋');
+// ボタン操作関数
+window.doGreet = () => alert('こんにちは！');
 window.doRoute = () => document.getElementById('route-panel').classList.add('show');
-window.closeRoute = () => document.getElementById('route-panel').classList.remove('show');
 window.doArea = () => document.getElementById('map-panel').classList.add('show');
-window.closeMap = () => document.getElementById('map-panel').classList.remove('show');
+window.closeAll = () => {
+  document.getElementById('route-panel').classList.remove('show');
+  document.getElementById('map-panel').classList.remove('show');
+};
 </script>
 </body>
 </html>
