@@ -1,3 +1,5 @@
+どこを変更するべきなのかわかりませんでした。
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -5,80 +7,778 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Kawara-nyan AR</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:#000; overflow:hidden; font-family:sans-serif; }
-  
-  #overlay { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; pointer-events:none; }
-  #bottom-ui { width:100%; padding:0 0 48px; display:flex; flex-direction:column; align-items:center; gap:16px; pointer-events:auto; }
-  #start-btn { background:linear-gradient(135deg,#1a3a6b,#2255a0); border:none; border-radius:50px; color:#fff; padding:16px 44px; cursor:pointer; font-size:16px; }
-  
-  #action-btns { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
-  .action-btn { background:rgba(10,25,60,0.85); border:1.5px solid #4a90d9; border-radius:50px; color:#fff; padding:10px 20px; cursor:pointer; }
-  
-  /* パネル表示用 */
-  .panel { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:300px; background:#050f1e; border:2px solid #4a90d9; border-radius:20px; padding:20px; z-index:50; display:none; pointer-events:auto; color:#fff; text-align:center; }
-  .panel.show { display:block; }
-  .close-btn { position:absolute; top:10px; right:15px; background:none; border:none; color:#fff; cursor:pointer; font-size:24px; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#000; overflow:hidden; font-family:'Hiragino Maru Gothic ProN','M PLUS Rounded 1c',sans-serif; }
+
+  #overlay {
+    position:fixed; inset:0; z-index:10;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:flex-end;
+    pointer-events:none;
+  }
+
+  /* 中央の照準リング */
+  #reticle {
+    position:fixed; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    width:64px; height:64px;
+    border:2px solid rgba(74,144,217,0.9);
+    border-radius:50%;
+    display:none;
+    z-index:20;
+    animation:reticlePulse 1.5s ease-in-out infinite;
+  }
+  #reticle::before {
+    content:''; position:absolute; inset:6px;
+    border:1px solid rgba(74,144,217,0.5);
+    border-radius:50%;
+  }
+  #reticle::after {
+    content:''; position:absolute;
+    top:50%; left:50%; transform:translate(-50%,-50%);
+    width:6px; height:6px;
+    background:rgba(74,144,217,0.9);
+    border-radius:50%;
+  }
+  @keyframes reticlePulse {
+    0%,100% { box-shadow:0 0 0 0 rgba(74,144,217,0.4); }
+    50%      { box-shadow:0 0 0 12px rgba(74,144,217,0); }
+  }
+
+  #speech {
+    position:fixed; top:60px; left:50%;
+    transform:translateX(-50%);
+    background:rgba(10,25,60,0.92);
+    border:1.5px solid rgba(74,144,217,0.8);
+    border-radius:16px;
+    padding:12px 20px;
+    color:#f0f8ff;
+    font-size:14px;
+    line-height:1.6;
+    text-align:center;
+    max-width:280px;
+    backdrop-filter:blur(8px);
+    visibility:hidden; opacity:0;
+    pointer-events:none;
+    z-index:30;
+    transition:opacity 0.3s ease, visibility 0s linear 0.3s;
+  }
+  #speech.show {
+    visibility:visible; opacity:1;
+    transition:opacity 0.3s ease, visibility 0s linear 0s;
+  }
+  #speech::after {
+    content:''; position:absolute;
+    bottom:-12px; left:50%; transform:translateX(-50%);
+    border-left:10px solid transparent;
+    border-right:10px solid transparent;
+    border-top:12px solid rgba(74,144,217,0.8);
+  }
+  .hi  { color:#4a90d9; font-weight:700; }
+  .hi2 { color:#f5901e; font-weight:700; }
+
+  /* 下部UI */
+  #bottom-ui {
+    width:100%; padding:0 0 48px;
+    display:flex; flex-direction:column;
+    align-items:center; gap:16px;
+    pointer-events:auto;
+  }
+
+  #hint {
+    background:rgba(0,0,0,0.65);
+    border:1px solid rgba(74,144,217,0.4);
+    border-radius:24px;
+    padding:10px 24px;
+    color:#b8d8f0;
+    font-size:13px;
+    backdrop-filter:blur(6px);
+    text-align:center;
+  }
+
+  #start-btn {
+    background:linear-gradient(135deg,#1a3a6b,#2255a0);
+    border:none; border-radius:50px;
+    color:#f0f8ff; font-size:16px; font-weight:700;
+    padding:16px 44px;
+    box-shadow:0 0 32px rgba(74,144,217,0.6);
+    cursor:pointer;
+    letter-spacing:0.05em;
+    animation:btnPulse 2s ease-in-out infinite;
+  }
+  @keyframes btnPulse {
+    0%,100% { box-shadow:0 0 24px rgba(74,144,217,0.5); }
+    50%      { box-shadow:0 0 44px rgba(110,198,240,0.8); }
+  }
+
+  #tap-hint {
+    color:#b8d8f0; font-size:14px;
+    background:rgba(0,0,0,0.55);
+    border-radius:20px; padding:8px 20px;
+    border:1px solid rgba(74,144,217,0.3);
+    display:none;
+  }
+
+  #action-btns {
+    display:none; gap:10px; flex-wrap:wrap; justify-content:center;
+  }
+  .action-btn {
+    background:rgba(10,25,60,0.85);
+    border:1.5px solid rgba(74,144,217,0.6);
+    border-radius:50px;
+    color:#b8d8f0; font-size:13px; font-weight:700;
+    padding:9px 18px; cursor:pointer;
+    backdrop-filter:blur(6px);
+  }
+  .action-btn.orange {
+    border-color:rgba(245,144,30,0.6);
+    color:#fcd9a0;
+  }
+
+  /* 非対応メッセージ */
+  #not-supported {
+    position:fixed; inset:0;
+    background:#050f1e;
+    display:none; flex-direction:column;
+    align-items:center; justify-content:center;
+    color:#f0f8ff; text-align:center;
+    padding:40px; z-index:100;
+    gap:16px;
+  }
+  #not-supported h2 { color:#4a90d9; font-size:20px; }
+  #not-supported p  { color:#6baed6; font-size:14px; line-height:1.7; }
+  #not-supported .emoji { font-size:48px; }
+
+  /* WebXR canvas */
+  canvas { display:block; width:100vw; height:100vh; }
+
+  /* キラキラパーティクル */
+  .particle {
+    position:fixed; pointer-events:none; z-index:25;
+    border-radius:50%;
+    animation:particleFly 1.2s ease-out forwards;
+  }
+  @keyframes particleFly {
+    0%   { opacity:1; transform:translate(0,0) scale(1); }
+    100% { opacity:0; transform:translate(var(--tx),var(--ty)) scale(0); }
+  }
+
+  /* 周辺マップパネル */
+  #map-panel {
+    position:fixed; top:50%; left:50%;
+    transform:translate(-50%,-50%) scale(0.85);
+    width:min(340px, 90vw);
+    background:rgba(5,15,40,0.96);
+    border:1.5px solid rgba(74,144,217,0.7);
+    border-radius:20px;
+    padding:16px;
+    z-index:50;
+    visibility:hidden;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.3s ease, transform 0.3s cubic-bezier(0.34,1.56,0.64,1), visibility 0s linear 0.3s;
+    backdrop-filter:blur(12px);
+    box-shadow:0 0 48px rgba(74,144,217,0.4);
+  }
+  #map-panel.show {
+    visibility:visible; opacity:1; pointer-events:auto;
+    transform:translate(-50%,-50%) scale(1);
+    transition:opacity 0.3s ease, transform 0.3s cubic-bezier(0.34,1.56,0.64,1), visibility 0s linear 0s;
+  }
+  #map-panel h3 {
+    color:#4a90d9; font-size:14px; font-weight:700;
+    text-align:center; margin-bottom:12px;
+    letter-spacing:0.08em;
+  }
+  #map-panel .close-btn {
+    position:absolute; top:10px; right:14px;
+    background:none; border:none;
+    color:#6baed6; font-size:18px; cursor:pointer;
+  }
+  #map-panel svg { width:100%; height:auto; display:block; border-radius:10px; }
+  .map-road { stroke:#334155; stroke-width:6; fill:none; stroke-linecap:round; }
+  .map-road-main { stroke:#475569; stroke-width:10; fill:none; stroke-linecap:round; }
+  .map-label { font-size:9px; fill:#e2e8f0; text-anchor:middle; font-family:sans-serif; }
+  .map-pin { fill:#f5901e; }
+  .map-you { fill:#38bdf8; }
+  .route-line { stroke:#f5901e; stroke-width:2.5; fill:none; stroke-dasharray:6,4; stroke-linecap:round; }
+
+  /* 道案内ステップ */
+  #route-panel {
+    position:fixed; top:50%; left:50%;
+    transform:translate(-50%,-50%) scale(0.85);
+    width:min(320px, 88vw);
+    background:rgba(5,15,40,0.96);
+    border:1.5px solid rgba(245,144,30,0.7);
+    border-radius:20px;
+    padding:20px 18px;
+    z-index:50;
+    visibility:hidden;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.3s ease, transform 0.3s cubic-bezier(0.34,1.56,0.64,1), visibility 0s linear 0.3s;
+    backdrop-filter:blur(12px);
+    box-shadow:0 0 48px rgba(245,144,30,0.3);
+  }
+  #route-panel.show {
+    visibility:visible; opacity:1; pointer-events:auto;
+    transform:translate(-50%,-50%) scale(1);
+    transition:opacity 0.3s ease, transform 0.3s cubic-bezier(0.34,1.56,0.64,1), visibility 0s linear 0s;
+  }
+  #route-panel h3 { color:#f5901e; font-size:14px; font-weight:700; text-align:center; margin-bottom:14px; }
+  #route-panel .close-btn { position:absolute; top:10px; right:14px; background:none; border:none; color:#6baed6; font-size:18px; cursor:pointer; }
+  .route-step {
+    display:flex; align-items:center; gap:12px;
+    padding:9px 0;
+    border-bottom:1px solid rgba(74,144,217,0.12);
+    color:#e2e8f0; font-size:13px; line-height:1.5;
+  }
+  .route-step:last-child { border-bottom:none; }
+  .route-icon { font-size:22px; flex-shrink:0; width:32px; text-align:center; }
 </style>
 </head>
 <body>
 
-<div id="overlay">
-  <div id="map-panel" class="panel">
-    <button class="close-btn" onclick="hide('map-panel')">✕</button>
-    <h3>📍 周辺マップ</h3>
-    <p>ここに地図の画像などを表示します</p>
-  </div>
-  <div id="route-panel" class="panel">
-    <button class="close-btn" onclick="hide('route-panel')">✕</button>
-    <h3>🏁 ルート案内</h3>
-    <p>目的地までの案内はこちら</p>
-  </div>
+<div id="not-supported">
+  <div class="emoji">📱</div>
+  <h2>WebARを起動できませんでした</h2>
+  <p>
+    Androidの<strong>Chrome</strong>ブラウザ（最新版）でお試しください。<br><br>
+    また、<strong>カメラの許可</strong>が必要です。<br>
+    設定 → サイトの設定 → カメラ → 許可
+  </p>
+</div>
 
-  <div id="bottom-ui">
-    <button id="start-btn" onclick="startAR()">✨ ARを起動する</button>
-    <div id="action-btns">
-      <button class="action-btn" onclick="alert('にゃ！')">👋 あいさつ</button>
-      <button class="action-btn" onclick="show('route-panel')">🗺️ ルート</button>
-      <button class="action-btn" onclick="show('map-panel')">📍 周辺</button>
-    </div>
-  </div>
+<div id="overlay">
+  <div id="reticle"></div>
+  <div id="speech"></div>
+
+  <!-- 周辺マップパネル -->
+  <div id="map-panel">
+    <button class="close-btn" onclick="closeMap()">✕</button>
+    <h3>🗺️ 周辺マップ（デモ）</h3>
+    <svg viewBox="0 0 300 240" xmlns="http://www.w3.org/2000/svg">
+      <rect width="300" height="240" fill="#050f1e"/>
+      <ellipse cx="70" cy="110" rx="55" ry="45" fill="#14532d" opacity="0.5"/>
+      <text x="70" y="113" class="map-label" fill="#86efac">公園</text>
+      <line x1="125" y1="10" x2="125" y2="230" stroke="#4b5563" stroke-width="10" fill="none" stroke-linecap="round"/>
+      <line x1="10" y1="115" x2="290" y2="115" stroke="#4b5563" stroke-width="10" fill="none" stroke-linecap="round"/>
+      <line x1="160" y1="10" x2="160" y2="230" stroke="#374151" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <line x1="200" y1="10" x2="200" y2="230" stroke="#374151" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <line x1="10" y1="80"  x2="290" y2="80"  stroke="#374151" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <line x1="10" y1="150" x2="290" y2="150" stroke="#374151" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <rect x="130" y="95" width="55" height="38" rx="5" fill="#0a1830" stroke="#4a90d9" stroke-width="2"/>
+      <text x="157" y="110" class="map-label" fill="#4a90d9" font-size="10" font-weight="bold">現在地</text>
+      <text x="157" y="124" class="map-label" fill="#6baed6" font-size="8">You are here</text>
+      <circle cx="240" cy="185" r="8" fill="#38bdf8" opacity="0.9"/>
+      <circle cx="240" cy="185" r="4" fill="white"/>
+      <text x="240" y="202" class="map-label" fill="#38bdf8" font-size="8">現在地</text>
+      <polyline points="240,185 240,150 200,150 200,115 157,115" stroke="#f5901e" stroke-width="2.5" fill="none" stroke-dasharray="6,4" stroke-linecap="round"/>
+      <circle cx="157" cy="95" r="6" fill="#f5901e"/>
+      <circle cx="15" cy="220" r="4" fill="#38bdf8"/>
+      <text x="23" y="224" class="map-label" fill="#94a3b8" font-size="7" text-anchor="start">現在地</text>
+      <circle cx="70" cy="220" r="4" fill="#f5901e"/>
+      <text x="78" y="224" class="map-label" fill="#94a3b8" font-size="7" text-anchor="start">目的地</text>
+    </svg>
+  </div>
+
+  <!-- 道案内パネル -->
+  <div id="route-panel">
+    <button class="close-btn" onclick="closeRoute()">✕</button>
+    <h3>🗺️ 案内所までのルート</h3>
+    <div class="route-step"><div class="route-icon">➡️</div><div>まっすぐ進んでください（約50m）</div></div>
+    <div class="route-step"><div class="route-icon">➡️</div><div>交差点を右折してください（約30m）</div></div>
+    <div class="route-step"><div class="route-icon">⤴️</div><div>階段を上がってください（2F）</div></div>
+    <div class="route-step"><div class="route-icon">🏁</div><div><strong style="color:#f5901e">つきあたりを左</strong>です。<br>案内所はすぐそこです！</div></div>
+  </div>
+
+  <div id="bottom-ui">
+    <div id="hint">📱 ARカメラを起動してKawara-nyanを召喚！</div>
+    <button id="start-btn" onclick="startAR()">✨ ARを起動する</button>
+    <div id="tap-hint">📍 地面をタップしてKawara-nyanを配置</div>
+    <div id="action-btns">
+      <button class="action-btn" onclick="doGreet()">👋 あいさつ</button>
+      <button class="action-btn orange" onclick="doRoute()">🗺️ 案内所のルート</button>
+      <button class="action-btn" onclick="doArea()">📍 周辺</button>
+    </div>
+  </div>
 </div>
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
-// パネル制御用関数
-window.show = (id) => document.getElementById(id).classList.add('show');
-window.hide = (id) => document.getElementById(id).classList.remove('show');
+let camera, scene, renderer, xrSession, hitTestSource, hitTestSourceReq;
+let reticleObj, kawaraGroup, placed = false;
+let clock;
+let speechTimer = null;
 
-// AR起動関数
-window.startAR = async () => {
-  document.getElementById('start-btn').style.display = 'none';
-  
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera();
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.xr.enabled = true;
-  document.body.appendChild(renderer.domElement);
+const speechEl   = document.getElementById('speech');
+const reticleEl  = document.getElementById('reticle');
+const tapHint    = document.getElementById('tap-hint');
+const actionBtns = document.getElementById('action-btns');
+const startBtn   = document.getElementById('start-btn');
+const hintEl     = document.getElementById('hint');
 
-  // かわらニャンの読み込み
-  const loader = new THREE.TextureLoader();
-  loader.load('./kawaranyan.webp', (tex) => {
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
-    sprite.scale.set(0.5, 0.5, 1);
-    sprite.position.z = -1; // カメラの少し前方に配置
-    scene.add(sprite);
-  });
+// ── WebXR 対応チェック ──────────────────────────────────────────────
+window.startAR = async function() {
+  if (!navigator.xr) { showNotSupported(); return; }
+  const supported = await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
+  if (!supported) { showNotSupported(); return; }
 
-  // セッション開始
-  const session = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['viewer'] });
-  renderer.xr.setSession(session);
-  renderer.setAnimationLoop((time, frame) => {
-    renderer.render(scene, camera);
-  });
+  startBtn.style.display = 'none';
+  hintEl.style.display   = 'none';
+
+  initThree();
+  await startXRSession();
 };
+
+function showNotSupported() {
+  document.getElementById('not-supported').style.display = 'flex';
+}
+
+// ── Three.js 初期化 ─────────────────────────────────────────────────
+function initThree() {
+  scene    = new THREE.Scene();
+  clock    = new THREE.Clock();
+  camera   = new THREE.PerspectiveCamera();
+  renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+  // ライト
+  const ambient = new THREE.AmbientLight(0xf0f8ff, 1.2);
+  scene.add(ambient);
+  const dirLight = new THREE.DirectionalLight(0x4a90d9, 1.0);
+  dirLight.position.set(1, 3, 2);
+  scene.add(dirLight);
+  const fillLight = new THREE.DirectionalLight(0xf5901e, 0.4);
+  fillLight.position.set(-2, 1, -1);
+  scene.add(fillLight);
+
+  // ヒットテスト用レティクル
+  const reticleGeo = new THREE.RingGeometry(0.04, 0.06, 32).rotateX(-Math.PI/2);
+  const reticleMat = new THREE.MeshBasicMaterial({ color:0x4a90d9, side:THREE.DoubleSide });
+  reticleObj = new THREE.Mesh(reticleGeo, reticleMat);
+  reticleObj.matrixAutoUpdate = false;
+  reticleObj.visible = false;
+  scene.add(reticleObj);
+
+  // Kawara-nyanスプライト
+  kawaraGroup = buildKawara();
+  kawaraGroup.visible = false;
+  scene.add(kawaraGroup);
+
+  preloadPoses();
+}
+
+// ── Kawara-nyanをCanvasで描いてスプライト化 ─────────────────────────
+function buildKawara() {
+  const group = new THREE.Group();
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = 256;
+  canvas.height = 384;
+  const ctx = canvas.getContext('2d');
+
+  const svgBlob = new Blob([kawaraSVG()], {type:'image/svg+xml'});
+  const url = URL.createObjectURL(svgBlob);
+  const img = new Image();
+  img.onload = () => {
+    ctx.drawImage(img, 0, 0, 256, 384);
+    URL.revokeObjectURL(url);
+    tex.needsUpdate = true;
+  };
+  img.src = url;
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.premultiplyAlpha = true;
+
+  const mat = new THREE.SpriteMaterial({
+    map: tex,
+    transparent: true,
+    depthWrite: false,
+    sizeAttenuation: true,
+  });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(0.55, 0.82, 1);
+  sprite.position.y = 0.41;
+  group.add(sprite);
+
+  // 足元の光の輪（青系）
+  const ringGeo = new THREE.RingGeometry(0.08, 0.13, 32).rotateX(-Math.PI/2);
+  const ringMat = new THREE.MeshBasicMaterial({ color:0x4a90d9, side:THREE.DoubleSide, transparent:true, opacity:0.55 });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.position.y = 0.005;
+  group.add(ring);
+
+  group.userData.baseY  = 0;
+  group.userData.t      = 0;
+  group.userData.ring   = ring;
+  group.userData.sprite = sprite;
+
+  return group;
+}
+
+// ── Kawara-nyan SVG（はっぴ姿の猫キャラ） ──────────────────────────
+function kawaraSVG() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 320" width="512" height="682">
+  <defs>
+    <!-- 肌色グラデ -->
+    <radialGradient id="skin" cx="50%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#fff8f0"/>
+      <stop offset="100%" stop-color="#ffe8cc"/>
+    </radialGradient>
+    <!-- 顔の右側ベージュ -->
+    <radialGradient id="face2" cx="50%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#f5c5a0"/>
+      <stop offset="100%" stop-color="#e8a878"/>
+    </radialGradient>
+    <!-- はっぴ濃紺 -->
+    <linearGradient id="happi" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a3a6b"/>
+      <stop offset="100%" stop-color="#0f2548"/>
+    </linearGradient>
+    <!-- 着物グレー -->
+    <linearGradient id="kimono" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#c8d4dc"/>
+      <stop offset="100%" stop-color="#a8b8c8"/>
+    </linearGradient>
+    <!-- 帽子水色 -->
+    <linearGradient id="hat" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8fd4f8"/>
+      <stop offset="100%" stop-color="#5ab8e8"/>
+    </linearGradient>
+    <!-- 帯オレンジ -->
+    <linearGradient id="obi" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8a840"/>
+      <stop offset="100%" stop-color="#e07010"/>
+    </linearGradient>
+    <!-- 足元ライトブルー -->
+    <linearGradient id="leg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#80c4e8"/>
+      <stop offset="100%" stop-color="#5ab0d8"/>
+    </linearGradient>
+    <!-- 目グラデ -->
+    <radialGradient id="eye" cx="40%" cy="35%" r="55%">
+      <stop offset="0%" stop-color="#2255a0"/>
+      <stop offset="100%" stop-color="#0a1830"/>
+    </radialGradient>
+  </defs>
+
+  <!-- ===== 体（着物・はっぴ） ===== -->
+  <!-- 着物本体 -->
+  <ellipse cx="120" cy="210" rx="45" ry="55" fill="url(#kimono)"/>
+  <!-- はっぴ左パネル（濃紺） -->
+  <path d="M 80 175 Q 72 185 68 220 Q 66 240 78 245 L 110 248 L 110 190 Q 98 180 80 175 Z" fill="url(#happi)"/>
+  <!-- はっぴ右パネル（濃紺） -->
+  <path d="M 160 175 Q 168 185 172 220 Q 174 240 162 245 L 130 248 L 130 190 Q 142 180 160 175 Z" fill="url(#happi)"/>
+  <!-- 帯（オレンジ） -->
+  <rect x="78" y="218" width="84" height="18" rx="6" fill="url(#obi)"/>
+  <!-- はっぴ紋（左胸の白丸） -->
+  <circle cx="88" cy="200" r="10" fill="none" stroke="white" stroke-width="2.5"/>
+  <circle cx="88" cy="200" r="4" fill="none" stroke="white" stroke-width="1.5"/>
+
+  <!-- ===== 脚 ===== -->
+  <!-- 左脚（ライトブルー） -->
+  <rect x="90" y="252" width="18" height="38" rx="8" fill="url(#leg)"/>
+  <!-- 右脚（ライトブルー・跳ね上げ） -->
+  <path d="M 132 252 Q 150 256 158 248 Q 165 240 160 232" stroke="url(#leg)" stroke-width="18" fill="none" stroke-linecap="round"/>
+  <!-- 左草履（オレンジ） -->
+  <ellipse cx="99" cy="292" rx="13" ry="7" fill="url(#obi)"/>
+  <!-- 右草履（オレンジ・跳ね） -->
+  <ellipse cx="164" cy="232" rx="11" ry="7" fill="url(#obi)" transform="rotate(-30 164 232)"/>
+
+  <!-- ===== 腕 ===== -->
+  <!-- 左腕（挙げている、はっぴ） -->
+  <path d="M 82 178 Q 60 165 50 145 Q 44 132 50 125" stroke="url(#happi)" stroke-width="16" fill="none" stroke-linecap="round"/>
+  <!-- 左手（白い肉球） -->
+  <ellipse cx="50" cy="122" rx="13" ry="11" fill="url(#skin)"/>
+  <!-- 肉球ピンク -->
+  <circle cx="50" cy="125" r="5" fill="#ffb0c0" opacity="0.8"/>
+  <circle cx="44" cy="119" r="3" fill="#ffb0c0" opacity="0.6"/>
+  <circle cx="56" cy="119" r="3" fill="#ffb0c0" opacity="0.6"/>
+  <!-- 右腕（下げ、はっぴ） -->
+  <path d="M 158 178 Q 172 188 175 205 Q 177 218 170 222" stroke="url(#happi)" stroke-width="16" fill="none" stroke-linecap="round"/>
+  <!-- 右手 -->
+  <ellipse cx="170" cy="224" rx="11" ry="10" fill="url(#skin)"/>
+
+  <!-- ===== 首 ===== -->
+  <rect x="112" y="148" width="16" height="20" rx="6" fill="url(#skin)"/>
+
+  <!-- ===== 頭 ===== -->
+  <!-- 頭全体（丸い） -->
+  <ellipse cx="120" cy="105" rx="50" ry="52" fill="url(#skin)"/>
+  <!-- 右側のベージュ斑（三毛猫） -->
+  <ellipse cx="140" cy="100" rx="25" ry="28" fill="url(#face2)" opacity="0.6"/>
+  <!-- 頭頂部の白い部分 -->
+  <ellipse cx="108" cy="88" rx="22" ry="18" fill="rgba(255,255,255,0.5)" transform="rotate(-15 108 88)"/>
+
+  <!-- 耳（左） -->
+  <path d="M 78 72 Q 72 48 90 52 Q 98 54 96 72 Z" fill="url(#skin)"/>
+  <path d="M 82 70 Q 78 58 90 60 Q 94 62 92 70 Z" fill="#ffb0c0"/>
+  <!-- 耳（右） -->
+  <path d="M 162 72 Q 168 48 150 52 Q 142 54 144 72 Z" fill="url(#skin)"/>
+  <path d="M 158 70 Q 162 58 150 60 Q 146 62 148 70 Z" fill="#ffb0c0"/>
+
+  <!-- ヒゲの線（頭の模様） -->
+  <path d="M 98 78 Q 100 70 104 74" stroke="#d4a888" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M 104 74 Q 107 66 112 70" stroke="#d4a888" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+
+  <!-- 目（左） -->
+  <ellipse cx="104" cy="102" rx="13" ry="12" fill="white"/>
+  <ellipse cx="104" cy="102" rx="9"  ry="9"  fill="url(#eye)"/>
+  <ellipse cx="104" cy="102" rx="5"  ry="5"  fill="#0a1020"/>
+  <circle  cx="101" cy="99"  r="2.5" fill="white" opacity="0.9"/>
+  <!-- 目の上線（目尻跳ね上げ） -->
+  <path d="M 92 96 Q 104 90 116 96" stroke="#0a1020" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- 目（右） -->
+  <ellipse cx="136" cy="102" rx="13" ry="12" fill="white"/>
+  <ellipse cx="136" cy="102" rx="9"  ry="9"  fill="url(#eye)"/>
+  <ellipse cx="136" cy="102" rx="5"  ry="5"  fill="#0a1020"/>
+  <circle  cx="133" cy="99"  r="2.5" fill="white" opacity="0.9"/>
+  <path d="M 124 96 Q 136 90 148 96" stroke="#0a1020" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- 鼻 -->
+  <ellipse cx="120" cy="114" rx="5" ry="3.5" fill="#ffaaaa"/>
+  <!-- 口（にっこり） -->
+  <path d="M 108 122 Q 120 132 132 122" stroke="#e07070" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M 111 123 Q 120 130 129 123 Q 120 127 111 123" fill="white" opacity="0.7"/>
+
+  <!-- ほっぺ（赤み） -->
+  <ellipse cx="90"  cy="114" rx="11" ry="7" fill="rgba(255,150,150,0.25)"/>
+  <ellipse cx="150" cy="114" rx="11" ry="7" fill="rgba(255,150,150,0.25)"/>
+
+  <!-- ヒゲ（顔） -->
+  <line x1="68" y1="112" x2="98"  y2="116" stroke="#888" stroke-width="1.2" opacity="0.6"/>
+  <line x1="68" y1="118" x2="98"  y2="118" stroke="#888" stroke-width="1.2" opacity="0.6"/>
+  <line x1="68" y1="124" x2="98"  y2="120" stroke="#888" stroke-width="1.2" opacity="0.6"/>
+  <line x1="142" y1="116" x2="172" y2="112" stroke="#888" stroke-width="1.2" opacity="0.6"/>
+  <line x1="142" y1="118" x2="172" y2="118" stroke="#888" stroke-width="1.2" opacity="0.6"/>
+  <line x1="142" y1="120" x2="172" y2="124" stroke="#888" stroke-width="1.2" opacity="0.6"/>
+
+  <!-- ===== はっぴ帽子（折り紙風） ===== -->
+  <!-- 帽子本体 -->
+  <path d="M 88 72 Q 90 52 120 48 Q 150 52 152 72 L 145 78 Q 130 68 120 65 Q 110 68 95 78 Z" fill="url(#hat)"/>
+  <!-- 帽子上部の折り目 -->
+  <path d="M 95 78 Q 108 62 120 65 Q 132 62 145 78 Q 130 72 120 70 Q 110 72 95 78 Z" fill="rgba(255,255,255,0.3)"/>
+  <!-- 帽子の模様（白い円） -->
+  <circle cx="108" cy="60" r="6" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+  <circle cx="132" cy="60" r="6" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+  <circle cx="120" cy="56" r="5" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.2"/>
+</svg>`;
+}
+
+// ── あいさつポーズSVG（左手をさらに高く） ──────────────────────────
+function svgGreet() {
+  return kawaraSVG().replace(
+    'Q 60 165 50 145 Q 44 132 50 125" stroke="url(#happi)" stroke-width="16" fill="none" stroke-linecap="round"/>\n  <!-- 左手（白い肉球） -->\n  <ellipse cx="50" cy="122" rx="13" ry="11" fill="url(#skin)"/>',
+    'Q 58 150 52 120 Q 48 100 55 85" stroke="url(#happi)" stroke-width="16" fill="none" stroke-linecap="round"/>\n  <ellipse cx="55" cy="82" rx="13" ry="11" fill="url(#skin)"/>'
+  );
+}
+
+// ── OKポーズSVG（右腕を横に） ──────────────────────────────────────
+function svgOK() {
+  return kawaraSVG().replace(
+    'Q 172 188 175 205 Q 177 218 170 222" stroke="url(#happi)" stroke-width="16" fill="none" stroke-linecap="round"/>\n  <!-- 右手 -->\n  <ellipse cx="170" cy="224" rx="11" ry="10" fill="url(#skin)"/>',
+    'Q 178 178 190 168 Q 200 162 208 160" stroke="url(#happi)" stroke-width="16" fill="none" stroke-linecap="round"/><circle cx="208" cy="157" r="13" fill="none" stroke="url(#happi)" stroke-width="10"/><line x1="218" y1="147" x2="226" y2="139" stroke="url(#happi)" stroke-width="9" stroke-linecap="round"/>'
+  );
+}
+
+// ── 両手広げポーズ ──────────────────────────────────────────────────
+function svgOpen() {
+  return kawaraSVG()
+    .replace(
+      'Q 60 165 50 145 Q 44 132 50 125" stroke="url(#happi)" stroke-width="16" fill="none" stroke-linecap="round"/>\n  <!-- 左手（白い肉球） -->\n  <ellipse cx="50" cy="122" rx="13" ry="11" fill="url(#skin)"/>',
+      'Q 52 160 38 148 Q 28 140 18 138" stroke="url(#happi)" stroke-width="16" fill="none" stroke-linecap="round"/><ellipse cx="14" cy="137" rx="13" ry="11" fill="url(#skin)"/>'
+    )
+    .replace(
+      'Q 172 188 175 205 Q 177 218 170 222" stroke="url(#happi)" stroke-width="16" fill="none" stroke-linecap="round"/>\n  <!-- 右手 -->\n  <ellipse cx="170" cy="224" rx="11" ry="10" fill="url(#skin)"/>',
+      'Q 178 178 196 165 Q 208 158 218 156" stroke="url(#happi)" stroke-width="16" fill="none" stroke-linecap="round"/><ellipse cx="222" cy="155" rx="11" ry="10" fill="url(#skin)"/>'
+    );
+}
+
+// ── WebXR セッション開始 ────────────────────────────────────────────
+async function startXRSession() {
+  try {
+    xrSession = await navigator.xr.requestSession('immersive-ar', {
+      requiredFeatures: ['hit-test'],
+      optionalFeatures: ['dom-overlay'],
+      domOverlay: { root: document.getElementById('overlay') }
+    });
+  } catch(e) {
+    showNotSupported();
+    return;
+  }
+
+  renderer.xr.setReferenceSpaceType('local');
+  await renderer.xr.setSession(xrSession);
+
+  const refSpace = await xrSession.requestReferenceSpace('viewer');
+  hitTestSourceReq = await xrSession.requestHitTestSource({ space: refSpace });
+
+  reticleEl.style.display = 'block';
+  tapHint.style.display   = 'block';
+
+  xrSession.addEventListener('select', onSelect);
+  renderer.setAnimationLoop(renderXR);
+}
+
+// ── タップで配置 ────────────────────────────────────────────────────
+function onSelect() {
+  if (!reticleObj.visible) return;
+
+  if (!placed) {
+    kawaraGroup.visible = true;
+    placed = true;
+    tapHint.style.display    = 'none';
+    actionBtns.style.display = 'flex';
+    spawnParticles();
+    kawara_say('にゃ！ここに来たにゃ！✨<br><span class="hi">どこへでも</span>ご案内するにゃ♪');
+  }
+
+  kawaraGroup.position.setFromMatrixPosition(reticleObj.matrix);
+  kawaraGroup.userData.baseY = kawaraGroup.position.y;
+}
+
+// ── レンダリングループ ──────────────────────────────────────────────
+let lastFloatUpdate = 0;
+function renderXR(timestamp, frame) {
+  const dt = clock.getDelta();
+
+  if (frame) {
+    const refSpace = renderer.xr.getReferenceSpace();
+    const hitTestResults = frame.getHitTestResults(hitTestSourceReq);
+
+    if (hitTestResults.length > 0) {
+      const hit  = hitTestResults[0];
+      const pose = hit.getPose(refSpace);
+      reticleObj.visible = true;
+      reticleObj.matrix.fromArray(pose.transform.matrix);
+    } else {
+      reticleObj.visible = false;
+    }
+  }
+
+  if (placed && kawaraGroup.visible && timestamp - lastFloatUpdate > 33) {
+    lastFloatUpdate = timestamp;
+    kawaraGroup.userData.t += dt;
+    const t = kawaraGroup.userData.t;
+    const floatY = Math.sin(t * 1.4) * 0.03;
+    kawaraGroup.position.y = kawaraGroup.userData.baseY + floatY;
+
+    const ringScale = 1 - floatY * 6;
+    kawaraGroup.userData.ring.scale.set(ringScale, ringScale, ringScale);
+    kawaraGroup.rotation.y += (0 - kawaraGroup.rotation.y) * 0.05;
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ── セリフ表示 ──────────────────────────────────────────────────────
+window.kawara_say = function(text) {
+  speechEl.innerHTML = text;
+  speechEl.classList.remove('show');
+  void speechEl.offsetWidth;
+  speechEl.classList.add('show');
+  clearTimeout(speechTimer);
+  speechTimer = setTimeout(() => { speechEl.classList.remove('show'); }, 5000);
+};
+
+// ── ポーズテクスチャを事前生成 ──────────────────────────────────────
+const poseTextures = {};
+let posesReady = false;
+let poseTimer  = null;
+
+function preloadPoses() {
+  const defs = {
+    normal: kawaraSVG(),
+    greet:  svgGreet(),
+    ok:     svgOK(),
+    open:   svgOpen(),
+  };
+  let loaded = 0;
+  const total = Object.keys(defs).length;
+  for (const [name, svgStr] of Object.entries(defs)) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 384;
+    const ctx = canvas.getContext('2d');
+    const blob = new Blob([svgStr], {type:'image/svg+xml'});
+    const url  = URL.createObjectURL(blob);
+    const img  = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, 256, 384);
+      URL.revokeObjectURL(url);
+      poseTextures[name] = new THREE.CanvasTexture(canvas);
+      loaded++;
+      if (loaded === total) posesReady = true;
+    };
+    img.src = url;
+  }
+}
+
+function setPose(pose) {
+  if (!kawaraGroup || !posesReady) return;
+  const sprite = kawaraGroup.userData.sprite;
+  if (!sprite) return;
+  const tex = poseTextures[pose] || poseTextures['normal'];
+  sprite.material.map = tex;
+  sprite.material.needsUpdate = true;
+  clearTimeout(poseTimer);
+  if (pose !== 'normal') {
+    poseTimer = setTimeout(() => setPose('normal'), 3000);
+  }
+}
+
+// ── アクションボタン ────────────────────────────────────────────────
+window.doGreet = function() {
+  setPose('greet');
+  kawara_say('Kawara-nyanにゃ！<br>何でもお申し付けくださいにゃ！');
+};
+
+window.doRoute = function() {
+  setPose('ok');
+  document.getElementById('route-panel').classList.add('show');
+  kawara_say('案内所へのルートにゃ！<br>一緒に行くにゃ！');
+};
+window.closeRoute = function() {
+  document.getElementById('route-panel').classList.remove('show');
+};
+
+window.doArea = function() {
+  setPose('open');
+  document.getElementById('map-panel').classList.add('show');
+  kawara_say('周辺の地図にゃ！✨');
+};
+window.closeMap = function() {
+  document.getElementById('map-panel').classList.remove('show');
+};
+
+// ── パーティクル演出 ────────────────────────────────────────────────
+function spawnParticles() {
+  const colors = ['#4a90d9','#f5901e','#6ec6f0','#fcd9a0','#80c4e8'];
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  for (let i = 0; i < 24; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = Math.random() * 8 + 4;
+    const angle = Math.random() * Math.PI * 2;
+    const dist  = Math.random() * 120 + 40;
+    p.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${cx}px; top:${cy}px;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      --tx:${Math.cos(angle)*dist}px;
+      --ty:${Math.sin(angle)*dist}px;
+      animation-delay:${Math.random()*0.3}s;
+    `;
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 1500);
+  }
+}
 </script>
 </body>
 </html>
