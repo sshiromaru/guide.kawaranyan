@@ -9,15 +9,14 @@
   body { background:#000; overflow:hidden; font-family:sans-serif; }
   #overlay { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; pointer-events:none; }
   
-  /* ボタンのスタイル */
+  /* UIエリア */
   #bottom-ui { width:100%; padding:0 0 48px; display:flex; flex-direction:column; align-items:center; gap:16px; pointer-events:auto; }
-  #start-btn { background:linear-gradient(135deg,#1a3a6b,#2255a0); border:none; border-radius:50px; color:#fff; padding:16px 44px; cursor:pointer; }
+  #start-btn { background:linear-gradient(135deg,#1a3a6b,#2255a0); border:none; border-radius:50px; color:#fff; padding:16px 44px; cursor:pointer; font-size:16px; }
   
-  /* 全ボタンを常に表示する設定に変更 */
+  /* ボタン配置 */
   #action-btns { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
   .action-btn { background:rgba(10,25,60,0.85); border:1.5px solid #4a90d9; border-radius:50px; color:#fff; padding:10px 20px; cursor:pointer; }
-  .orange { border-color:#f5901e; color:#fcd9a0; }
-
+  
   /* パネル */
   #map-panel, #route-panel { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:280px; background:#050f1e; border:1px solid #4a90d9; border-radius:20px; padding:20px; z-index:50; display:none; pointer-events:auto; color:#fff; }
   .show { display:block !important; }
@@ -36,7 +35,7 @@
     <button id="start-btn" onclick="startAR()">✨ ARを起動する</button>
     <div id="action-btns">
       <button class="action-btn" onclick="doGreet()">👋 あいさつ</button>
-      <button class="action-btn orange" onclick="doRoute()">🗺️ ルート</button>
+      <button class="action-btn" onclick="doRoute()">🗺️ ルート</button>
       <button class="action-btn" onclick="doArea()">📍 周辺</button>
     </div>
   </div>
@@ -45,41 +44,37 @@
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
-let renderer, scene, camera, reticleObj, kawaraGroup;
-
-window.startAR = async () => {
-  document.getElementById('start-btn').style.display = 'none';
-  // Three.jsの初期化
-  scene = new THREE.Scene();
-  scene.add(new THREE.AmbientLight(0xffffff, 1));
-  camera = new THREE.PerspectiveCamera();
-  renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.xr.enabled = true;
-  document.body.insertBefore(renderer.domElement, document.body.firstChild);
-
-  // キャラクター
-  const loader = new THREE.TextureLoader();
-  const tex = loader.load('./kawaranyan.webp');
-  kawaraGroup = new THREE.Group();
-  kawaraGroup.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent:true })));
-  kawaraGroup.visible = false;
-  scene.add(kawaraGroup);
-
-  const session = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test'] });
-  renderer.xr.setSession(session);
-  renderer.setAnimationLoop((time, frame) => {
-    renderer.render(scene, camera);
-  });
-};
-
-// ボタン操作関数
+// グローバルスコープに関数を登録（これでボタンから呼び出せるようになります）
 window.doGreet = () => alert('こんにちは！');
 window.doRoute = () => document.getElementById('route-panel').classList.add('show');
 window.doArea = () => document.getElementById('map-panel').classList.add('show');
 window.closeAll = () => {
   document.getElementById('route-panel').classList.remove('show');
   document.getElementById('map-panel').classList.remove('show');
+};
+
+window.startAR = async () => {
+  document.getElementById('start-btn').style.display = 'none';
+  
+  const scene = new THREE.Scene();
+  scene.add(new THREE.AmbientLight(0xffffff, 1));
+  
+  const camera = new THREE.PerspectiveCamera();
+  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  // ARセッション開始
+  try {
+    const session = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['viewer'] });
+    renderer.xr.setSession(session);
+    renderer.setAnimationLoop((time, frame) => {
+        renderer.render(scene, camera);
+    });
+  } catch (e) {
+    alert("ARが開始できませんでした: " + e.message);
+  }
 };
 </script>
 </body>
