@@ -9,34 +9,38 @@
   body { background:#000; overflow:hidden; font-family:sans-serif; }
   
   #overlay { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; pointer-events:none; }
-  
   #bottom-ui { width:100%; padding:0 0 48px; display:flex; flex-direction:column; align-items:center; gap:16px; pointer-events:auto; }
-  #start-btn { background:linear-gradient(135deg,#1a3a6b,#2255a0); border:none; border-radius:50px; color:#fff; padding:16px 44px; cursor:pointer; font-size:16px; pointer-events:auto; }
+  #start-btn { background:linear-gradient(135deg,#1a3a6b,#2255a0); border:none; border-radius:50px; color:#fff; padding:16px 44px; cursor:pointer; font-size:16px; }
   
   #action-btns { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
-  .action-btn { background:rgba(10,25,60,0.85); border:1.5px solid #4a90d9; border-radius:50px; color:#fff; padding:10px 20px; cursor:pointer; pointer-events:auto; }
+  .action-btn { background:rgba(10,25,60,0.85); border:1.5px solid #4a90d9; border-radius:50px; color:#fff; padding:10px 20px; cursor:pointer; }
   
-  #map-panel, #route-panel { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:280px; background:#050f1e; border:1px solid #4a90d9; border-radius:20px; padding:20px; z-index:50; display:none; pointer-events:auto; color:#fff; }
-  .show { display:block !important; }
-  .close-btn { position:absolute; top:10px; right:15px; background:none; border:none; color:#fff; cursor:pointer; font-size:20px; }
-  
-  #status-msg { position:fixed; top:20px; color:white; background:rgba(0,0,0,0.5); padding:10px; z-index:100; pointer-events:none; }
+  /* パネル表示用 */
+  .panel { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:300px; background:#050f1e; border:2px solid #4a90d9; border-radius:20px; padding:20px; z-index:50; display:none; pointer-events:auto; color:#fff; text-align:center; }
+  .panel.show { display:block; }
+  .close-btn { position:absolute; top:10px; right:15px; background:none; border:none; color:#fff; cursor:pointer; font-size:24px; }
 </style>
 </head>
 <body>
 
-<div id="status-msg">準備完了</div>
-
 <div id="overlay">
-  <div id="map-panel"><button class="close-btn" id="close-map">✕</button><h3>🗺️ 周辺情報</h3><p>ここに周辺マップが表示されます。</p></div>
-  <div id="route-panel"><button class="close-btn" id="close-route">✕</button><h3>🏁 ルート案内</h3><p>案内所までご案内します！</p></div>
+  <div id="map-panel" class="panel">
+    <button class="close-btn" onclick="hide('map-panel')">✕</button>
+    <h3>📍 周辺マップ</h3>
+    <p>ここに地図の画像などを表示します</p>
+  </div>
+  <div id="route-panel" class="panel">
+    <button class="close-btn" onclick="hide('route-panel')">✕</button>
+    <h3>🏁 ルート案内</h3>
+    <p>目的地までの案内はこちら</p>
+  </div>
 
   <div id="bottom-ui">
-    <button id="start-btn">✨ ARを起動する</button>
+    <button id="start-btn" onclick="startAR()">✨ ARを起動する</button>
     <div id="action-btns">
-      <button class="action-btn" id="btn-greet">👋 あいさつ</button>
-      <button class="action-btn" id="btn-route">🗺️ ルート</button>
-      <button class="action-btn" id="btn-area">📍 周辺</button>
+      <button class="action-btn" onclick="alert('にゃ！')">👋 あいさつ</button>
+      <button class="action-btn" onclick="show('route-panel')">🗺️ ルート</button>
+      <button class="action-btn" onclick="show('map-panel')">📍 周辺</button>
     </div>
   </div>
 </div>
@@ -44,43 +48,37 @@
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
-// --- ボタンの動作設定 ---
-document.getElementById('btn-greet').addEventListener('click', () => alert('こんにちは！'));
-document.getElementById('btn-route').addEventListener('click', () => document.getElementById('route-panel').classList.add('show'));
-document.getElementById('btn-area').addEventListener('click', () => document.getElementById('map-panel').classList.add('show'));
-document.getElementById('close-map').addEventListener('click', () => document.getElementById('map-panel').classList.remove('show'));
-document.getElementById('close-route').addEventListener('click', () => document.getElementById('route-panel').classList.remove('show'));
+// パネル制御用関数
+window.show = (id) => document.getElementById(id).classList.add('show');
+window.hide = (id) => document.getElementById(id).classList.remove('show');
 
-const status = document.getElementById('status-msg');
-
-// --- AR起動処理 ---
-document.getElementById('start-btn').addEventListener('click', async () => {
-  status.innerText = "カメラを許可してください...";
+// AR起動関数
+window.startAR = async () => {
+  document.getElementById('start-btn').style.display = 'none';
   
-  try {
-    const scene = new THREE.Scene();
-    scene.add(new THREE.AmbientLight(0xffffff, 1));
-    
-    const camera = new THREE.PerspectiveCamera();
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.xr.enabled = true;
-    document.body.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera();
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.appendChild(renderer.domElement);
 
-    const session = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['viewer'] });
-    renderer.xr.setSession(session);
-    
-    document.getElementById('start-btn').style.display = 'none';
-    status.innerText = "AR起動中";
+  // かわらニャンの読み込み
+  const loader = new THREE.TextureLoader();
+  loader.load('./kawaranyan.webp', (tex) => {
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
+    sprite.scale.set(0.5, 0.5, 1);
+    sprite.position.z = -1; // カメラの少し前方に配置
+    scene.add(sprite);
+  });
 
-    renderer.setAnimationLoop((time, frame) => {
-      renderer.render(scene, camera);
-    });
-  } catch (e) {
-    status.innerText = "エラー: " + e.message;
-    console.error(e);
-  }
-});
+  // セッション開始
+  const session = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['viewer'] });
+  renderer.xr.setSession(session);
+  renderer.setAnimationLoop((time, frame) => {
+    renderer.render(scene, camera);
+  });
+};
 </script>
 </body>
 </html>
