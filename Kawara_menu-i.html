@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>かわらニャン メニュー</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:linear-gradient(135deg,#0a1628,#0d2144);
+    font-family:'M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif;
+    min-height:100vh; color:#f0f8ff;
+    display:flex; flex-direction:column;
+    align-items:center; padding:32px 20px;
+  }
+  .grid {
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(74,144,217,0.04) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(74,144,217,0.04) 1px,transparent 1px);
+    background-size:60px 60px; z-index:0;
+  }
+  .wrap {
+    position:relative; z-index:1;
+    width:100%; max-width:400px;
+  }
+  .head {
+    text-align:center; margin-bottom:24px;
+  }
+  .head h1 {
+    font-size:20px; font-weight:700;
+    background:linear-gradient(135deg,#4a90d9,#f5901e);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    margin-bottom:4px;
+  }
+  .head p { font-size:12px; color:#6baed6; }
+
+  /* アクションボタン */
+  .action-btn {
+    display:flex; align-items:center; gap:14px;
+    width:100%;
+    background:rgba(5,20,50,0.85);
+    border:1.5px solid rgba(74,144,217,0.45);
+    border-radius:16px; padding:16px 20px;
+    margin-bottom:12px; cursor:pointer;
+    text-align:left;
+    transition:all 0.2s;
+    backdrop-filter:blur(8px);
+  }
+  .action-btn:active { transform:scale(0.97); background:rgba(74,144,217,0.15); }
+  .action-btn .icon { font-size:28px; flex-shrink:0; }
+  .action-btn .label { font-size:15px; font-weight:700; color:#f0f8ff; }
+  .action-btn .desc  { font-size:11px; color:#6baed6; margin-top:2px; }
+  .action-btn.pink { border-color:rgba(245,144,30,0.45); }
+
+  /* セリフ吹き出し */
+  #speech-box {
+    display:none;
+    background:rgba(5,20,50,0.95);
+    border:1.5px solid rgba(74,144,217,0.6);
+    border-radius:20px; padding:20px;
+    margin-bottom:16px;
+    box-shadow:0 0 32px rgba(74,144,217,0.25);
+    animation:popIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes popIn {
+    from { opacity:0; transform:scale(0.9); }
+    to   { opacity:1; transform:scale(1); }
+  }
+  #speech-box .close {
+    float:right; background:none; border:none;
+    color:#6baed6; font-size:18px; cursor:pointer; line-height:1;
+  }
+  #speech-box .char {
+    display:flex; align-items:flex-start; gap:12px; margin-top:4px;
+  }
+  #speech-box .face { font-size:36px; flex-shrink:0; }
+  #speech-box .text { font-size:14px; line-height:1.8; color:#f0f8ff; }
+  #speech-box .text .hi  { color:#4a90d9; font-weight:700; }
+  #speech-box .text .hi2 { color:#f5901e; font-weight:700; }
+
+  /* 地図パネル */
+  #map-box {
+    display:none;
+    background:rgba(5,20,50,0.95);
+    border:1.5px solid rgba(245,144,30,0.5);
+    border-radius:20px; padding:16px;
+    margin-bottom:16px;
+    box-shadow:0 0 32px rgba(245,144,30,0.2);
+    animation:popIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  #map-box .map-head {
+    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom:10px;
+  }
+  #map-box .map-head h3 { font-size:14px; font-weight:700; color:#f5901e; }
+  #map-box .close {
+    background:none; border:none; color:#6baed6; font-size:18px; cursor:pointer;
+  }
+  #map-box svg { width:100%; height:auto; display:block; border-radius:10px; }
+
+  /* ルートパネル */
+  #route-box {
+    display:none;
+    background:rgba(5,20,50,0.95);
+    border:1.5px solid rgba(74,144,217,0.5);
+    border-radius:20px; padding:16px;
+    margin-bottom:16px;
+    box-shadow:0 0 32px rgba(74,144,217,0.2);
+    animation:popIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  #route-box .route-head {
+    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom:12px;
+  }
+  #route-box .route-head h3 { font-size:14px; font-weight:700; color:#4a90d9; }
+  #route-box .close { background:none; border:none; color:#6baed6; font-size:18px; cursor:pointer; }
+  .route-step {
+    display:flex; align-items:flex-start; gap:12px;
+    padding:10px 0; border-bottom:1px solid rgba(74,144,217,0.12);
+    font-size:13px; color:#b8d8f0; line-height:1.5;
+  }
+  .route-step:last-child { border-bottom:none; }
+  .route-icon { font-size:22px; flex-shrink:0; width:32px; text-align:center; }
+
+  .map-road      { stroke:#334155; stroke-width:6;  fill:none; stroke-linecap:round; }
+  .map-road-main { stroke:#475569; stroke-width:10; fill:none; stroke-linecap:round; }
+  .map-label     { font-size:9px; fill:#e2e8f0; text-anchor:middle; font-family:sans-serif; }
+  .route-line    { stroke:#f5901e; stroke-width:2.5; fill:none; stroke-dasharray:6,4; stroke-linecap:round; }
+  .map-pin       { fill:#f5901e; }
+</style>
+</head>
+<body>
+<div class="grid"></div>
+<div class="wrap">
+  <div class="head">
+    <h1>🐾 かわらニャン メニュー</h1>
+    <p>ボタンをタップしてね！</p>
+  </div>
+
+  <!-- セリフ吹き出し -->
+  <div id="speech-box">
+    <button class="close" onclick="closeAll()">✕</button>
+    <div class="char">
+      <div class="face">🐱</div>
+      <div class="text" id="speech-text"></div>
+    </div>
+  </div>
+
+  <!-- ルートパネル -->
+  <div id="route-box">
+    <div class="route-head">
+      <h3>🗺️ 案内所までのルート</h3>
+      <button class="close" onclick="closeAll()">✕</button>
+    </div>
+    <div class="route-step"><div class="route-icon">➡️</div><div>まっすぐ進んでください（約50m）</div></div>
+    <div class="route-step"><div class="route-icon">➡️</div><div>交差点を右折してください（約30m）</div></div>
+    <div class="route-step"><div class="route-icon">⤴️</div><div>階段を上がってください（2F）</div></div>
+    <div class="route-step"><div class="route-icon">🏁</div><div><strong style="color:#f5901e">つきあたりを左</strong>です。<br>案内所はすぐそこにゃ！</div></div>
+  </div>
+
+  <!-- 地図パネル -->
+  <div id="map-box">
+    <div class="map-head">
+      <h3>🗼 東京駅周辺マップ</h3>
+      <button class="close" onclick="closeAll()">✕</button>
+    </div>
+    <svg viewBox="0 0 300 240" xmlns="http://www.w3.org/2000/svg">
+      <rect width="300" height="240" fill="#0f0a1e"/>
+      <ellipse cx="70" cy="110" rx="55" ry="45" fill="#14532d" opacity="0.5"/>
+      <text x="70" y="113" class="map-label" fill="#86efac">皇居外苑</text>
+      <line x1="125" y1="10" x2="125" y2="230" class="map-road-main"/>
+      <line x1="10"  y1="115" x2="290" y2="115" class="map-road-main"/>
+      <line x1="160" y1="10" x2="160" y2="230" class="map-road"/>
+      <line x1="200" y1="10" x2="200" y2="230" class="map-road"/>
+      <line x1="240" y1="10" x2="240" y2="230" class="map-road"/>
+      <line x1="10"  y1="80"  x2="290" y2="80"  class="map-road"/>
+      <line x1="10"  y1="150" x2="290" y2="150" class="map-road"/>
+      <line x1="10"  y1="185" x2="290" y2="185" class="map-road"/>
+      <rect x="130" y="95" width="55" height="38" rx="5" fill="#1e1040" stroke="#4a90d9" stroke-width="2"/>
+      <text x="157" y="110" class="map-label" fill="#4a90d9" font-size="10" font-weight="bold">東京駅</text>
+      <text x="157" y="124" class="map-label" fill="#6baed6" font-size="8">Tokyo Station</text>
+      <rect x="130" y="60" width="25" height="18" rx="3" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+      <text x="142" y="72" class="map-label" fill="#94a3b8" font-size="7">丸ビル</text>
+      <rect x="160" y="60" width="25" height="18" rx="3" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+      <text x="172" y="72" class="map-label" fill="#94a3b8" font-size="7">新丸ビル</text>
+      <rect x="130" y="140" width="28" height="18" rx="3" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+      <text x="144" y="152" class="map-label" fill="#94a3b8" font-size="7">KITTE</text>
+      <circle cx="125" cy="80" r="6" fill="#0f172a" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="125" y="70" class="map-label" fill="#60a5fa" font-size="7">大手町</text>
+      <circle cx="200" cy="150" r="6" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
+      <text x="200" y="165" class="map-label" fill="#34d399" font-size="7">有楽町</text>
+      <!-- 現在地 -->
+      <circle cx="232" cy="190" r="8" fill="#38bdf8" opacity="0.9"/>
+      <circle cx="232" cy="190" r="4" fill="white"/>
+      <text x="232" y="207" class="map-label" fill="#38bdf8" font-size="7">現在地</text>
+      <!-- ルート -->
+      <polyline points="232,190 232,150 200,150 200,115 162,115" class="route-line"/>
+      <!-- 東京駅ピン -->
+      <polygon points="157,93 161,84 157,86 153,84" fill="#f5901e"/>
+      <circle cx="157" cy="93" r="5" fill="#f5901e"/>
+      <text x="157" y="83" class="map-label" fill="#f5901e" font-size="7">東京駅</text>
+      <!-- 凡例 -->
+      <circle cx="15" cy="220" r="4" fill="#38bdf8"/>
+      <text x="23" y="224" class="map-label" fill="#94a3b8" font-size="7" text-anchor="start">現在地</text>
+      <circle cx="68" cy="220" r="4" fill="#f5901e"/>
+      <text x="76" y="224" class="map-label" fill="#94a3b8" font-size="7" text-anchor="start">目的地</text>
+      <line x1="118" y1="220" x2="138" y2="220" stroke="#f5901e" stroke-width="2" stroke-dasharray="4,3"/>
+      <text x="146" y="224" class="map-label" fill="#94a3b8" font-size="7" text-anchor="start">ルート</text>
+    </svg>
+  </div>
+
+  <!-- ボタン -->
+  <button class="action-btn" onclick="doGreet()">
+    <div class="icon">👋</div>
+    <div>
+      <div class="label">あいさつ</div>
+      <div class="desc">かわらニャンが挨拶するにゃ</div>
+    </div>
+  </button>
+
+  <button class="action-btn pink" onclick="doRoute()">
+    <div class="icon">🗺️</div>
+    <div>
+      <div class="label">案内所のルート</div>
+      <div class="desc">案内所への道順を表示</div>
+    </div>
+  </button>
+
+  <button class="action-btn" onclick="doArea()">
+    <div class="icon">📍</div>
+    <div>
+      <div class="label">周辺</div>
+      <div class="desc">東京駅周辺の地図を表示</div>
+    </div>
+  </button>
+</div>
+
+<script>
+function closeAll() {
+  document.getElementById('speech-box').style.display = 'none';
+  document.getElementById('route-box').style.display  = 'none';
+  document.getElementById('map-box').style.display    = 'none';
+}
+
+function doGreet() {
+  closeAll();
+  document.getElementById('speech-text').innerHTML =
+    'にゃ～！<span class="hi">かわらニャン</span>だよ！🐾<br>何でもお申し付けくださいにゃ！';
+  document.getElementById('speech-box').style.display = 'block';
+  document.getElementById('speech-box').scrollIntoView({behavior:'smooth'});
+}
+
+function doRoute() {
+  closeAll();
+  document.getElementById('route-box').style.display = 'block';
+  document.getElementById('route-box').scrollIntoView({behavior:'smooth'});
+}
+
+function doArea() {
+  closeAll();
+  document.getElementById('map-box').style.display = 'block';
+  document.getElementById('map-box').scrollIntoView({behavior:'smooth'});
+}
+</script>
+</body>
+</html>
