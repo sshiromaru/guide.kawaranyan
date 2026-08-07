@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>KAWARA AR動画</title>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: linear-gradient(160deg, #1e1033 0%, #3b1a52 50%, #1a0f2e 100%);
+    font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
+    overflow: hidden;
+  }
+
+  #overlay {
+    position: fixed; inset: 0; pointer-events: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  }
+
+  /* 起動前スタート画面 */
+  #start-screen {
+    position: fixed; inset: 0; z-index: 20;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 20px; padding: 24px; text-align: center;
+    pointer-events: auto;
+  }
+  #start-screen h1 {
+    color: #f5e8ff; font-size: 22px; margin: 0 0 4px;
+    text-shadow: 0 0 16px rgba(192,132,252,0.6);
+  }
+  #start-screen p {
+    color: #d8c4f0; font-size: 14px; margin: 0; line-height: 1.6;
+  }
+  #start-btn {
+    margin-top: 8px;
+    padding: 16px 40px;
+    font-size: 17px; font-weight: bold; color: #1e1033;
+    background: linear-gradient(120deg, #c084fc, #f472b6);
+    border: none; border-radius: 999px;
+    box-shadow: 0 4px 24px rgba(192,132,252,0.5);
+  }
+
+  #not-supported {
+    display: none; position: fixed; inset: 0; z-index: 30;
+    background: rgba(20,10,35,0.96);
+    color: #f5e8ff; align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px; padding: 32px; text-align: center;
+  }
+
+  /* レティクル（照準） */
+  #reticle {
+    display: none; position: fixed; left: 50%; top: 50%;
+    width: 46px; height: 46px; margin: -23px 0 0 -23px;
+    border: 2px solid #c084fc; border-radius: 50%;
+    box-shadow: 0 0 14px rgba(192,132,252,0.8);
+    animation: reticlePulse 1.5s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes reticlePulse {
+    0%,100% { transform: scale(1);   opacity: .9; }
+    50%     { transform: scale(1.15); opacity: .5; }
+  }
+
+  #tap-hint {
+    display: none; pointer-events: none;
+    margin-bottom: 130px;
+    padding: 10px 20px;
+    background: rgba(30,16,51,0.75);
+    border: 1px solid rgba(192,132,252,0.5);
+    border-radius: 999px;
+    color: #f5e8ff; font-size: 14px;
+  }
+
+  #action-btns {
+    display: none;
+    pointer-events: auto;
+    margin-bottom: 16px;
+    gap: 14px;
+  }
+  .action-btn {
+    padding: 14px 28px;
+    font-size: 15px; font-weight: bold; color: #1e1033;
+    background: linear-gradient(120deg, #c084fc, #f472b6);
+    border: none; border-radius: 999px;
+    box-shadow: 0 4px 18px rgba(192,132,252,0.5);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .action-btn.secondary {
+    background: rgba(30,16,51,0.75);
+    color: #f5e8ff;
+    border: 1px solid rgba(192,132,252,0.5);
+    box-shadow: none;
+  }
+
+  #opacity-btns {
+    display: none;
+    pointer-events: auto;
+    margin-bottom: 40px;
+    gap: 8px;
+  }
+  .opacity-btn {
+    padding: 8px 18px;
+    font-size: 12px; font-weight: bold; color: #f5e8ff;
+    background: rgba(30,16,51,0.75);
+    border: 1px solid rgba(192,132,252,0.4);
+    border-radius: 999px;
+  }
+  .opacity-btn.active {
+    background: linear-gradient(120deg, #c084fc, #f472b6);
+    color: #1e1033;
+    border-color: transparent;
+  }
+
+  #exit-btn {
+    position: fixed; top: calc(16px + env(safe-area-inset-top)); right: 16px; z-index: 15;
+    display: none; pointer-events: auto;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(20,10,35,0.6); color: #f5e8ff;
+    border: 1px solid rgba(255,255,255,0.25);
+    font-size: 18px; line-height: 40px; text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+  <h1>🎬 KAWARA ARシアター</h1>
+  <p>カメラで床や机を映すと、<br>その場に動画スクリーンを設置できます。</p>
+  <button id="start-btn" onclick="startAR()">ARを起動</button>
+</div>
+
+<div id="not-supported">
+  <p>このデバイス・ブラウザはAR機能に対応していません。<br>Android版Google Chromeでお試しください。</p>
+</div>
+
+<div id="exit-btn" onclick="location.reload()">✕</div>
+
+<div id="reticle"></div>
+
+<div id="overlay">
+  <div id="tap-hint">画面をタップして動画スクリーンを設置</div>
+  <div id="action-btns">
+    <button class="action-btn" id="play-btn" onclick="togglePlay()">▶ 再生</button>
+    <button class="action-btn secondary" onclick="resetPlacement()">📍 置き直す</button>
+  </div>
+  <div id="opacity-btns">
+    <button class="opacity-btn active" data-opacity="0.8" onclick="setOpacity(0.8)">80%</button>
+    <button class="opacity-btn" data-opacity="0.6" onclick="setOpacity(0.6)">60%</button>
+    <button class="opacity-btn" data-opacity="0.4" onclick="setOpacity(0.4)">40%</button>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ── 設定 ──────────────────────────────────────────────────────────────
+const VIDEO_SRC = 'Kawara_video.mp4';   // ← 動画ファイル名（同一ディレクトリに配置）
+const PANEL_WIDTH = 1.4;                // メートル単位。高さは動画アスペクト比から自動計算
+
+// ── 動画要素はページ読み込み直後に生成し、即座にダウンロードを開始する ──
+// (スタート画面を見ている間にバックグラウンドで読み込みを進め、体感待ち時間を減らす)
+const videoEl = document.createElement('video');
+videoEl.src = VIDEO_SRC;
+videoEl.crossOrigin = 'anonymous';
+videoEl.loop = true;
+videoEl.playsInline = true;
+videoEl.muted = true;
+videoEl.preload = 'auto';
+let videoReady = false;
+videoEl.addEventListener('canplay', () => { videoReady = true; }, { once: true });
+videoEl.addEventListener('error', () => {
+  const code = videoEl.error ? videoEl.error.code : '?';
+  showVideoError(`動画の読み込みに失敗しました (code:${code})\nファイル名/配置場所を確認してください: ${VIDEO_SRC}`);
+});
+
+let camera, scene, renderer, xrSession, hitTestSourceReq;
+let reticleObj, videoGroup, videoMesh, videoTexture;
+let awaitingPlacement = true; // true の間だけタップで設置/移動する
+
+const reticleEl  = document.getElementById('reticle');
+const tapHint    = document.getElementById('tap-hint');
+const actionBtns = document.getElementById('action-btns');
+const opacityBtns= document.getElementById('opacity-btns');
+const startBtn   = document.getElementById('start-btn');
+const startScreen= document.getElementById('start-screen');
+const exitBtn    = document.getElementById('exit-btn');
+const playBtn    = document.getElementById('play-btn');
+
+// ── AR開始 ───────────────────────────────────────────────────────────
+window.startAR = async function () {
+  if (!navigator.xr) { showNotSupported(); return; }
+  const supported = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
+  if (!supported) { showNotSupported(); return; }
+
+  startScreen.style.display = 'none';
+
+  initThree();
+  primeVideo(); // ← await しない。バックグラウンドで進行させ、ARの起動をブロックしない
+  await startXRSession();
+};
+
+function showNotSupported() {
+  document.getElementById('not-supported').style.display = 'flex';
+}
+
+// ── Three.js 初期化 ──────────────────────────────────────────────────
+function initThree() {
+  scene    = new THREE.Scene();
+  camera   = new THREE.PerspectiveCamera();
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+  const ambient = new THREE.AmbientLight(0xffffff, 1.4);
+  scene.add(ambient);
+
+  // ヒットテスト用レティクル
+  const reticleGeo = new THREE.RingGeometry(0.05, 0.07, 32).rotateX(-Math.PI / 2);
+  const reticleMat = new THREE.MeshBasicMaterial({ color: 0xc084fc, side: THREE.DoubleSide });
+  reticleObj = new THREE.Mesh(reticleGeo, reticleMat);
+  reticleObj.matrixAutoUpdate = false;
+  reticleObj.visible = false;
+  scene.add(reticleObj);
+
+  // 動画パネル（初期は仮の16:9サイズ、メタデータ取得後に補正）
+  videoGroup = new THREE.Group();
+  videoGroup.visible = false;
+
+  const geo = new THREE.PlaneGeometry(PANEL_WIDTH, PANEL_WIDTH * 9 / 16);
+  const mat = new THREE.MeshBasicMaterial({
+    map: videoTexture, side: THREE.DoubleSide, toneMapped: false,
+    transparent: true, opacity: 0.8
+  });
+  videoMesh = new THREE.Mesh(geo, mat);
+  videoGroup.add(videoMesh);
+
+  // 縁取り（フレーム風の枠）
+  const frameGeo = new THREE.EdgesGeometry(geo);
+  const frameMat = new THREE.LineBasicMaterial({ color: 0xc084fc, transparent: true, opacity: 0.8 });
+  const frame = new THREE.LineSegments(frameGeo, frameMat);
+  frame.userData.isFrame = true;
+  videoGroup.add(frame);
+
+  scene.add(videoGroup);
+
+  window.addEventListener('resize', onWindowResize);
+}
+
+function onWindowResize() {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ── 動画の最初の1フレームを無音でプリロード(黒画面回避) ────────────
+// ページ読み込み時からダウンロードが進んでいるので、ここでは
+// 「1フレーム目を描画させて一時停止する」処理だけを行う。
+function primeVideo() {
+  return new Promise((resolve) => {
+    videoEl.addEventListener('loadedmetadata', () => {
+      // 実際の動画アスペクト比に合わせてパネルの高さを補正
+      const ratio = videoEl.videoHeight / videoEl.videoWidth;
+      videoMesh.geometry.dispose();
+      videoMesh.geometry = new THREE.PlaneGeometry(PANEL_WIDTH, PANEL_WIDTH * ratio);
+    }, { once: true });
+
+    videoTexture = new THREE.VideoTexture(videoEl);
+    videoTexture.colorSpace = THREE.SRGBColorSpace;
+    videoMesh.material.map = videoTexture;
+
+    videoEl.play().then(() => {
+      videoEl.pause();
+      resolve();
+    }).catch((err) => {
+      showVideoError(`動画のプリロードに失敗しました: ${err.name} - ${err.message}`);
+      resolve();
+    });
+  });
+}
+
+function showVideoError(msg) {
+  console.error('[Kawara AR Video]', msg);
+  let box = document.getElementById('video-error-box');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'video-error-box';
+    box.style.cssText = 'position:fixed;left:12px;right:12px;bottom:120px;z-index:40;'
+      + 'background:rgba(120,20,20,0.9);color:#fff;padding:12px 16px;border-radius:10px;'
+      + 'font-size:13px;line-height:1.5;white-space:pre-wrap;pointer-events:none;';
+    document.body.appendChild(box);
+  }
+  box.textContent = msg;
+}
+
+// ── WebXR セッション開始 ─────────────────────────────────────────────
+async function startXRSession() {
+  try {
+    xrSession = await navigator.xr.requestSession('immersive-ar', {
+      requiredFeatures: ['hit-test'],
+      optionalFeatures: ['dom-overlay'],
+      domOverlay: { root: document.getElementById('overlay') }
+    });
+  } catch (e) {
+    showNotSupported();
+    return;
+  }
+
+  renderer.xr.setReferenceSpaceType('local');
+  await renderer.xr.setSession(xrSession);
+
+  const refSpace = await xrSession.requestReferenceSpace('viewer');
+  hitTestSourceReq = await xrSession.requestHitTestSource({ space: refSpace });
+
+  reticleEl.style.display = 'block';
+  tapHint.style.display   = 'block';
+  exitBtn.style.display   = 'flex';
+
+  xrSession.addEventListener('select', onSelect);
+  xrSession.addEventListener('end', () => location.reload());
+  renderer.setAnimationLoop(renderXR);
+}
+
+// ── タップで設置／移動（設置待ち状態の時だけ反応する） ───────────
+function onSelect() {
+  if (!reticleObj.visible) return;
+  if (!awaitingPlacement) return; // 設置済みなら、ボタン操作等の余計なタップは無視する
+
+  const hitPos = new THREE.Vector3().setFromMatrixPosition(reticleObj.matrix);
+
+  // 向きはヒットテストの回転を使わず自前で計算する
+  // (床の法線基準の回転をそのまま使うと、設置する向きによって上下が反転してしまうため)
+  const camPos = new THREE.Vector3();
+  camera.getWorldPosition(camPos);
+  const dir = new THREE.Vector3(camPos.x - hitPos.x, 0, camPos.z - hitPos.z);
+  if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1); // カメラ直上など特殊ケースの保険
+  dir.normalize();
+  const yaw = Math.atan2(dir.x, dir.z);
+
+  videoGroup.position.copy(hitPos);
+  videoGroup.position.y += (videoMesh.geometry.parameters.height / 2);
+  videoGroup.rotation.set(0, yaw, 0); // 常に直立・水平方向のみ回転(上下反転しない)
+
+  videoGroup.visible = true;
+  awaitingPlacement = false;
+  tapHint.style.display    = 'none';
+  actionBtns.style.display = 'flex';
+  opacityBtns.style.display = 'flex';
+}
+
+// ── 置き直し（再度タップで設置できる状態に戻す） ────────────────
+window.resetPlacement = function () {
+  awaitingPlacement = true;
+  videoGroup.visible = false;
+  actionBtns.style.display = 'none';
+  opacityBtns.style.display = 'none';
+  tapHint.style.display    = 'block';
+  videoEl.pause();
+  videoEl.muted = true;
+  videoEl.currentTime = 0;
+  playBtn.textContent = '▶ 再生';
+};
+
+// ── 透過度の切り替え(1.0 / 0.8 / 0.6) ───────────────────────────────
+window.setOpacity = function (val) {
+  videoMesh.material.opacity = val;
+  videoGroup.children.forEach((child) => {
+    if (child.userData.isFrame) child.material.opacity = val;
+  });
+  document.querySelectorAll('.opacity-btn').forEach((btn) => {
+    btn.classList.toggle('active', parseFloat(btn.dataset.opacity) === val);
+  });
+};
+
+// ── 再生／一時停止 ───────────────────────────────────────────────────
+let lastToggleAt = 0;
+window.togglePlay = function () {
+  // ARオーバーレイでは1タップでclickが二重発火することがあるため、
+  // 短時間内の連続呼び出しを無視する（誤動作防止）
+  const now = performance.now();
+  if (now - lastToggleAt < 400) return;
+  lastToggleAt = now;
+
+  if (videoEl.paused) {
+    videoEl.muted = false;
+    videoEl.play().then(() => {
+      playBtn.textContent = '⏸ 一時停止';
+    }).catch((err) => {
+      showVideoError(`再生できませんでした: ${err.name} - ${err.message}`);
+    });
+  } else {
+    videoEl.pause();
+    playBtn.textContent = '▶ 再生';
+  }
+};
+
+// ── レンダリングループ ───────────────────────────────────────────────
+function renderXR(timestamp, frame) {
+  if (frame) {
+    const refSpace = renderer.xr.getReferenceSpace();
+    const hitTestResults = frame.getHitTestResults(hitTestSourceReq);
+
+    if (hitTestResults.length > 0) {
+      const hit  = hitTestResults[0];
+      const pose = hit.getPose(refSpace);
+      reticleObj.visible = true;
+      reticleObj.matrix.fromArray(pose.transform.matrix);
+    } else {
+      reticleObj.visible = false;
+    }
+  }
+
+  if (videoTexture) videoTexture.needsUpdate = true;
+  renderer.render(scene, camera);
+}
+</script>
+</body>
+</html>
